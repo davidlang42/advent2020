@@ -18,9 +18,11 @@ fn main() {
 
 fn process(list: Vec<u32>) -> Result<u32, String> {
     for (index1, value1) in list.iter().enumerate() {
-        for value2 in list[(index1+1)..].iter() {
-            if value1 + value2 == 2020 {
-                return Ok(value1 * value2);
+        for (index2, value2) in list[(index1+1)..].iter().enumerate() {
+            for value3 in list[(index2+1)..].iter() {
+                if value1 + value2 + value3 == 2020 {
+                    return Ok(value1 * value2 * value3);
+                }
             }
         }
     }
