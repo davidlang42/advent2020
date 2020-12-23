@@ -28,12 +28,9 @@ fn main() {
 }
 
 fn process(list: Vec<HashMap<String, String>>) -> usize {
-    let mut count: usize = 0;
-    for passport in list {
-        let valid = REQUIRED_KEYS.iter().all(|key| passport.contains_key(*key));
-        if valid {
-            count += 1;
-        }
-    }
-    return count;
+    list.iter().filter(|passport| validate(passport)).count()
+}
+
+fn validate(passport: &HashMap<String,String>) -> bool {
+    REQUIRED_KEYS.iter().all(|key| passport.contains_key(*key))
 }
