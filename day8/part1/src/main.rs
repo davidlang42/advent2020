@@ -14,29 +14,16 @@ struct Instruction {
 }
 
 impl Instruction {
-    fn execute(&mut self, state: &mut ExecutionState) -> bool {
+    fn execute(&mut self) -> (bool, isize, isize) { // success, delta program_counter, delta accumulator
         if self.executed {
-            return false; // failed because command already executed
+            return (false, 0, 0); // failed because command already executed
         } else {
-            match self.command {
-                InstructionType::ACC => {
-                    state.accumulator += self.argument;
-                    state.program_counter += 1;
-                },
-                InstructionType::JMP => {
-                    let new_pc = state.program_counter as isize + self.argument;
-                    if new_pc >= 0 {
-                        state.program_counter = new_pc as usize;
-                    } else {
-                        return false; // failed because pc < 0
-                    }
-                },
-                InstructionType::NOP => {
-                    state.program_counter += 1;
-                }
-            }
             self.executed = true;
-            return true;
+            match self.command {
+                InstructionType::ACC => (true, 1, self.argument),
+                InstructionType::JMP => (true, self.argument, 0),
+                InstructionType::NOP => (true, 1, 0)
+            }
         }
     }
 }
@@ -49,7 +36,15 @@ struct ExecutionState {
 
 impl ExecutionState {
     fn execute_step(&mut self) -> bool {
-        self.instructions[self.program_counter].execute(&mut self)
+        let (success, delta_pc, delta_acc) = self.instructions[self.program_counter].execute();
+        let new_pc: isize = self.program_counter as isize + delta_pc;
+        if new_pc < 0 {
+            false
+        } else {
+            self.program_counter = new_pc as usize;
+            self.accumulator += delta_acc;
+            success
+        }
     }
 }
 
@@ -76,9 +71,9 @@ fn main() {
 fn parse_instruction(line: &str) -> Result<Instruction,String> {
     let parts: Vec<&str> = line.split(" ").collect();
     let com = match parts[0] {
-        "NOP" => InstructionType::NOP,
-        "ACC" => InstructionType::ACC,
-        "JMP" => InstructionType::JMP,
+        "nop" => InstructionType::NOP,
+        "acc" => InstructionType::ACC,
+        "jmp" => InstructionType::JMP,
         _ => return Err(format!("Command not recognised: {}", parts[0]))
     };
     let arg: isize = parts[1].replace("+","").parse().expect(&format!("Argument not integer: {}", parts[1]));
