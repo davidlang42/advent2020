@@ -32,21 +32,25 @@ fn main() {
 
 fn parse_rule(line: &str) -> Result<BagRule,String> {
     lazy_static! {
-        static ref NON_EMPTY_RULE: Regex = Regex::new("^([\\w ]+) bags contain (?:(\\d+) ([\\w ]+) bags?, )*(\\d+) ([\\w ]+) bags?\\.$").unwrap();
+        static ref NON_EMPTY_RULE: Regex = Regex::new("^([\\w ]+) bags contain (\\d+) ([\\w ]+) bags?(?:, (\\d+) ([\\w ]+) bags?)?(?:, (\\d+) ([\\w ]+) bags?)?(?:, (\\d+) ([\\w ]+) bags?)?\\.$").unwrap(); // NOTE: this will match 1-4 inner bags
         static ref EMPTY_RULE: Regex = Regex::new("^(.+) bags contain no other bags\\.$").unwrap();
     }
     match NON_EMPTY_RULE.captures(line) {
         Some(non_empty_match) => {
-            let groups = non_empty_match.iter();
+            let mut groups = non_empty_match.iter();
+            groups.next(); // full match string, eg: light red bags contain 1 bright white bag, 2 muted yellow bags.
             let outer: &str = groups.next().unwrap().unwrap().as_str();
-            let inners: HashMap<String, usize> = HashMap::new();
+            let mut inners: HashMap<String, usize> = HashMap::new();
             loop {
                 let number: usize = match groups.next() {
-                    Some(s) => s.unwrap().as_str().parse().unwrap(),
+                    Some(m) => match m {
+                        Some(s) => s.as_str().parse().unwrap(),
+                        None => continue
+                    },
                     None => break
                 };
                 let bag: &str = groups.next().unwrap().unwrap().as_str();
-                inners.insert(bag, number);
+                inners.insert(bag.to_string(), number);
             }
             Ok(BagRule {
                 outer_bag: outer.to_string(),
