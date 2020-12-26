@@ -1,5 +1,0 @@
-C:\Users\David Lang\source\repos\advent2020\day6\part2\target\debug\deps\part2.exe: src\main.rs
-
-C:\Users\David Lang\source\repos\advent2020\day6\part2\target\debug\deps\part2.d: src\main.rs
-
-src\main.rs:
