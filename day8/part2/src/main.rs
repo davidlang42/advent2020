@@ -67,19 +67,46 @@ fn main() {
         let filename = &args[1];
         let text = fs::read_to_string(&filename)
             .expect(&format!("Error reading from {}", filename));
-        let instructions: Vec<Instruction> = text.split("\r\n").map(|line| parse_instruction(line)
+        let mut instructions: Vec<Instruction> = text.split("\r\n").map(|line| parse_instruction(line)
             .expect(&format!("Error parsing instruction: {}",line))).collect();
-        let mut state = ExecutionState {
-            instructions: &instructions,
-            program_counter: 0,
-            accumulator: 0,
-            visited: HashSet::new()
+        for i in 0..instructions.len()-1 {
+            // toggle JMP/NOP command
+            let instruction: &mut Instruction = &mut instructions[i];
+            match instruction.command {
+                InstructionType::ACC => {
+                    continue;
+                },
+                InstructionType::NOP => {
+                    instruction.command = InstructionType::JMP;
+                },
+                InstructionType::JMP => {
+                    instruction.command = InstructionType::NOP;
+                },
+            }
+            // try executing
+            match execute(&instructions) {
+                Ok(result) => {
+                    println!("Result: {}", result);
+                    break; // success
+                },
+                Err(_) => {
+                    // no luck, continue loop after undoing changes
+                }
+            }
+            // toggle back to original command
+            let instruction: &mut Instruction = &mut instructions[i];
+            match instruction.command {
+                InstructionType::ACC => {
+                    panic!();
+                },
+                InstructionType::NOP => {
+                    instruction.command = InstructionType::JMP;
+                },
+                InstructionType::JMP => {
+                    instruction.command = InstructionType::NOP;
+                },
+            }
         };
-        match state.execute_to_completion() {
-            Ok(result) => println!("Result: {}", result),
-            Err(error) => println!("Error: {}\nAccumuator: {}", error, state.accumulator)
-        }
-        //TODO try toggling the nop/jmp instructions one at a time and re-executing until it succeeds
     } else {
         println!("Please provide 1 argument: Filename");
     }
@@ -98,4 +125,14 @@ fn parse_instruction(line: &str) -> Result<Instruction,String> {
         command: com,
         argument: arg
     })
+}
+
+fn execute(instructions: &Vec<Instruction>) -> Result<isize,String> {
+    let mut state = ExecutionState {
+        instructions: &instructions,
+        program_counter: 0,
+        accumulator: 0,
+        visited: HashSet::new()
+    };
+    state.execute_to_completion()
 }
