@@ -13,14 +13,14 @@ struct Instruction {
     argument: isize,
 }
 
-struct ExecutionState {
-    instructions: Vec<Instruction>,
+struct ExecutionState<'a> {
+    instructions: &'a Vec<Instruction>,
     visited: HashSet<usize>,
     program_counter: usize,
     accumulator: isize
 }
 
-impl ExecutionState {
+impl<'a> ExecutionState<'a> {
     fn execute_step(&mut self) -> bool {
         if self.visited.contains(&self.program_counter) {
             return false; // failed because command already executed
@@ -70,7 +70,7 @@ fn main() {
         let instructions: Vec<Instruction> = text.split("\r\n").map(|line| parse_instruction(line)
             .expect(&format!("Error parsing instruction: {}",line))).collect();
         let mut state = ExecutionState {
-            instructions: instructions,
+            instructions: &instructions,
             program_counter: 0,
             accumulator: 0,
             visited: HashSet::new()
