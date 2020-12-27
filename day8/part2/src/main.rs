@@ -47,6 +47,15 @@ impl ExecutionState {
         }
     }
 
+    fn execute_to_completion(&mut self) -> Result<isize,String> {
+        while self.execute_step() {
+            if self.is_complete() {
+                return Ok(self.accumulator);
+            }
+        }
+        Err("Program did not complete".to_string())
+    }
+
     fn is_complete(&self) -> bool {
         self.program_counter == self.instructions.len()
     }
@@ -65,10 +74,12 @@ fn main() {
             program_counter: 0,
             accumulator: 0
         };
-        let result = process(&mut state).unwrap();
+        match state.execute_to_completion() {
+            Ok(result) => println!("Result: {}", result),
+            Err(error) => println!("Error: {}\nAccumuator: {}", error, state.accumulator)
+        }
         //TODO try toggling the nop/jmp instructions one at a time and re-executing until it succeeds
         // (this requires changing ExecutionState to only need a mutable reference to instructions rather than ownership)
-        println!("Result: {}", result);
     } else {
         println!("Please provide 1 argument: Filename");
     }
@@ -88,13 +99,4 @@ fn parse_instruction(line: &str) -> Result<Instruction,String> {
         argument: arg,
         executed: false
     })
-}
-
-fn process(state: &mut ExecutionState) -> Result<isize,String> {
-    while state.execute_step() {
-        if state.is_complete() {
-            return Ok(state.accumulator);
-        }
-    }
-    Err("Program did not complete".to_string())
 }
