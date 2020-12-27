@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::env;
 use std::fs;
 
@@ -10,40 +11,39 @@ enum InstructionType {
 struct Instruction {
     command: InstructionType,
     argument: isize,
-    executed: bool
-}
-
-impl Instruction {
-    fn execute(&mut self) -> (bool, isize, isize) { // success, delta program_counter, delta accumulator
-        if self.executed {
-            return (false, 0, 0); // failed because command already executed
-        } else {
-            self.executed = true;
-            match self.command {
-                InstructionType::ACC => (true, 1, self.argument),
-                InstructionType::JMP => (true, self.argument, 0),
-                InstructionType::NOP => (true, 1, 0)
-            }
-        }
-    }
 }
 
 struct ExecutionState {
     instructions: Vec<Instruction>,
+    visited: HashSet<usize>,
     program_counter: usize,
     accumulator: isize
 }
 
 impl ExecutionState {
     fn execute_step(&mut self) -> bool {
-        let (success, delta_pc, delta_acc) = self.instructions[self.program_counter].execute();
-        let new_pc: isize = self.program_counter as isize + delta_pc;
-        if new_pc < 0 {
-            false
+        if self.visited.contains(&self.program_counter) {
+            return false; // failed because command already executed
         } else {
-            self.program_counter = new_pc as usize;
-            self.accumulator += delta_acc;
-            success
+            self.visited.insert(self.program_counter);
+            match self.instructions[self.program_counter].command {
+                InstructionType::ACC => {
+                    self.accumulator += self.instructions[self.program_counter].argument;
+                    self.program_counter += 1;
+                },
+                InstructionType::JMP => {
+                    let new_pc: isize = self.program_counter as isize + self.instructions[self.program_counter].argument;
+                    if new_pc < 0 {
+                        return false; // failed because jumped to before start of program
+                    } else {
+                        self.program_counter = new_pc as usize;
+                    }
+                },
+                InstructionType::NOP => {
+                    self.program_counter += 1;
+                }
+            }
+            return true;
         }
     }
 
@@ -72,14 +72,14 @@ fn main() {
         let mut state = ExecutionState {
             instructions: instructions,
             program_counter: 0,
-            accumulator: 0
+            accumulator: 0,
+            visited: HashSet::new()
         };
         match state.execute_to_completion() {
             Ok(result) => println!("Result: {}", result),
             Err(error) => println!("Error: {}\nAccumuator: {}", error, state.accumulator)
         }
         //TODO try toggling the nop/jmp instructions one at a time and re-executing until it succeeds
-        // (this requires changing ExecutionState to only need a mutable reference to instructions rather than ownership)
     } else {
         println!("Please provide 1 argument: Filename");
     }
@@ -96,7 +96,6 @@ fn parse_instruction(line: &str) -> Result<Instruction,String> {
     let arg: isize = parts[1].replace("+","").parse().expect(&format!("Argument not integer: {}", parts[1]));
     Ok(Instruction {
         command: com,
-        argument: arg,
-        executed: false
+        argument: arg
     })
 }
