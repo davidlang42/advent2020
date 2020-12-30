@@ -1,6 +1,7 @@
 use std::collections::HashSet;
 use std::env;
 use std::fs;
+//use cached::proc_macro::cached;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -19,6 +20,7 @@ fn main() {
     }
 }
 
+//#[cached]
 fn count_combinations(adapters: &HashSet<usize>, from: usize, to: usize) -> usize {
     if !adapters.contains(&from) && from != 0 {
         0
