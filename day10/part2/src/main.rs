@@ -20,24 +20,11 @@ fn main() {
 }
 
 fn count_combinations(adapters: &HashSet<usize>, from: usize, to: usize) -> usize {
-    let mut count: usize = 0;
-    //println!("Finding combinations from {} to {}", from, to);
-    if adapters.contains(&(from+1)) {
-        //println!("Adapters contains {}", from+1);
-        count += count_combinations(adapters, from+1, to);
+    if !adapters.contains(&from) && from != 0 {
+        0
+    } else if from+3 == to {
+        1
+    } else {
+        count_combinations(adapters, from+1, to) + count_combinations(adapters, from+2, to) + count_combinations(adapters, from+3, to)
     }
-    if adapters.contains(&(from+2)) {
-        //println!("Adapters contains {}", from+2);
-        count += count_combinations(adapters, from+2, to);
-    }
-    if adapters.contains(&(from+3)) {
-        //println!("Adapters contains {}", from+3);
-        count += count_combinations(adapters, from+3, to);
-    }
-    if from+3 == to {
-        //println!("Final adapter from {} to {}", from, to);
-        count += 1;
-    }
-    //println!("Resulting combinations from {} to {}: {}", from, to, count);
-    return count;
 }
