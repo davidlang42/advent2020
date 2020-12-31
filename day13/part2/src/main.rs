@@ -1,55 +1,47 @@
 use std::env;
 use std::fs;
-//use num::integer::lcm;
+use num::integer::lcm;
 
 const NEW_LINE: &str = "\r\n";
 
 fn main() {
     let args: Vec<String> = env::args().collect();
-    if args.len() == 3 {
+    if args.len() == 2 {
         let filename = &args[1];
-        let start: usize = args[2].parse().unwrap();
         let text = fs::read_to_string(&filename)
             .expect(&format!("Error reading from {}", filename));
         let lines: Vec<&str> = text.split(NEW_LINE).collect();
         //let earliest_time: usize = lines[0].parse().expect("First line should be the earliest timestamp");
         let values: Vec<&str> = lines[1].split(",").collect();
         let possible_buses: Vec<Option<usize>> = values.iter().map(|s| s.parse().ok()).collect();
-        //let actual_buses: Vec<usize> = possible_buses.iter().filter(|o| o.is_some()).map(|o| o.unwrap()).collect();
-        let mut timestamp = start;
-        while !verify(&possible_buses, &timestamp) {
-            timestamp += 1;
-            if timestamp % 100000000 == 0 {
-                println!("{}",timestamp);
-            }
-        }
-        println!("Result: {}", timestamp);
+        let result = process(&possible_buses);
+        println!("Result: {}", result);
     } else {
-        println!("Please provide 2 arguments: Filename, Starting point");
+        println!("Please provide 1 argument: Filename");
     }
 }
 
-fn verify(list: &Vec<Option<usize>>, start: &usize) -> bool {
-    for (offset, possible_bus) in list.iter().enumerate() {
+fn process(list: &Vec<Option<usize>>) -> usize {
+    let mut timestamp: usize = 0;
+    let mut offset: usize = 0;
+    let mut increment: usize = 1;
+    for possible_bus in list {
         match possible_bus {
             Some(bus) => {
-                if (start + offset) % bus != 0 {
-                    return false;
+                //println!("Looking for bus {} at timestamp {} + offset {}", bus, timestamp, offset);
+                loop {
+                    if (timestamp + offset) % bus == 0 {
+                        increment = lcm(increment, *bus);
+                        //println!("Found bus {} at timestamp {} + offset {} (now increment by {})", bus, timestamp, offset, increment);
+                        break;
+                    } else {
+                        timestamp += increment;
+                    }
                 }
             },
             None => ()
         }
+        offset += 1;
     }
-    true
+    timestamp
 }
-
-// fn lowest_common_multiple(list: &Vec<usize>) -> usize {
-//     let mut values = list.iter();
-//     let first: usize = *values.next().unwrap();
-//     let second: usize = *values.next().unwrap();
-//     let mut result: usize = lcm(first, second);
-//     while let Some(next) = values.next() {
-//         result = lcm(result, *next);
-//     }
-//     result
-// }
