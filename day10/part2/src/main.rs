@@ -10,22 +10,15 @@ struct AdapterSet {
 
 impl AdapterSet {
     fn count_combinations(&mut self, from: usize, to: usize) -> usize {
-        //println!("Counting combinations from {} to {}", from, to);
         match self.cached_combinations.get(&(from,to)) {
-            Some(result) => {
-                //println!("Cached result: {}", result);
-                *result
-            },
+            Some(result) => *result,
             None => {
                 if !self.numbers.contains(&from) && from != 0 {
-                    //println!("No adapter at {}", from);
                     0
                 } else if from+3 == to {
-                    //println!("Device joltage at {}", to);
                     1
                 } else {
                     let result = self.count_combinations(from+1, to) + self.count_combinations(from+2, to) + self.count_combinations(from+3, to);
-                    //println!("Result from {} to {}: {}", from, to, result);
                     self.cached_combinations.insert((from,to),result);
                     result
                 }
@@ -47,11 +40,10 @@ fn main() {
             numbers,
             cached_combinations: HashMap::new()
         };
-        //println!("Numbers: {:?}", numbers);
         println!("Device joltage: {}", target);
         let result = adapters.count_combinations(0, target);
         println!("Result: {}", result);
     } else {
-        println!("Please provide 2 arguments: Filename, Device Joltage");
+        println!("Please provide 1 argument: Filename");
     }
 }
