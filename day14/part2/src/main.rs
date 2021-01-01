@@ -28,32 +28,21 @@ impl MachineState {
     //     }
     // }
 
-    fn write_address(&mut self, original_address: &usize, value: &usize) {
-        let binary: [bool; BITS] = decimal_to_binary(original_address);
-        let mut list: Vec<[bool; BITS]> = vec![[false; BITS]];
+    fn write_address(&mut self, decimal_address: &usize, value: &usize) {
+        let mut binary: [bool; BITS] = decimal_to_binary(decimal_address);
+        let mut floating = Vec::new();
         for i in 0..BITS {
             match self.mask[i] {
-                BitMask::Override => {
-                    for mut address in list {
-                        address[i] = true;
-                    }
-                },
+                BitMask::Override => binary[i] = true,
                 BitMask::Floating => {
-                    let mut add_to_list: Vec<[bool; BITS]> = list.iter().map(|address| {
-                        let mut new_address = address.clone();
-                        new_address[i] = true;
-                        new_address
-                    }).collect();
-                    list.append(&mut add_to_list);
+                    binary[i] = false;
+                    floating.push(i)
                 },
-                BitMask::Passthrough => {
-                    for mut address in list {
-                        address[i] = binary[i];
-                    }
-                }
+                BitMask::Passthrough => ()
             }
         }
-        for address in list {
+        let addresses = floating_options(&binary, &floating);
+        for address in addresses {
             self.memory.insert(binary_to_decimal(&address), *value);
         }
     }
@@ -68,6 +57,20 @@ impl MachineState {
             }
         }
     }
+}
+
+fn floating_options(binary: &[bool; BITS], floating_indicies: &Vec<usize>) -> Vec<[bool; BITS]> {
+    let mut options: Vec<[bool; BITS]> = vec![*binary];
+    for index in floating_indicies {
+        let mut new_options: Vec<[bool; BITS]> = Vec::new();
+        for option in &options {
+            let mut new_option: [bool; BITS] = *option;
+            new_option[*index] = true;
+            new_options.push(new_option);
+        }
+        options.append(&mut new_options);
+    }
+    options
 }
 
 fn decimal_to_binary(decimal: &usize) -> [bool; BITS] {
