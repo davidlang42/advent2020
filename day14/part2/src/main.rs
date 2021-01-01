@@ -10,8 +10,9 @@ const BITS: usize = 36;
 
 #[derive(Copy, Clone)]
 enum BitMask {
-    Override(bool),
-    Passthrough()
+    Override,
+    Passthrough,
+    Floating
 }
 
 struct MachineState {
@@ -27,24 +28,43 @@ impl MachineState {
     //     }
     // }
 
-    fn write_address(&mut self, address: &usize, decimal: &usize) {
-        let mut binary: [bool; BITS] = decimal_to_binary(decimal);
+    fn write_address(&mut self, original_address: &usize, value: &usize) {
+        let binary: [bool; BITS] = decimal_to_binary(original_address);
+        let mut list: Vec<[bool; BITS]> = vec![[false; BITS]];
         for i in 0..BITS {
             match self.mask[i] {
-                BitMask::Override(bit) => binary[i] = bit,
-                BitMask::Passthrough() => ()
+                BitMask::Override => {
+                    for mut address in list {
+                        address[i] = true;
+                    }
+                },
+                BitMask::Floating => {
+                    let mut add_to_list: Vec<[bool; BITS]> = list.iter().map(|address| {
+                        let mut new_address = address.clone();
+                        new_address[i] = true;
+                        new_address
+                    }).collect();
+                    list.append(&mut add_to_list);
+                },
+                BitMask::Passthrough => {
+                    for mut address in list {
+                        address[i] = binary[i];
+                    }
+                }
             }
         }
-        self.memory.insert(*address, binary_to_decimal(&binary));
+        for address in list {
+            self.memory.insert(binary_to_decimal(&address), *value);
+        }
     }
 
     fn set_mask(&mut self, new_mask: &str) {
         let mut mask = new_mask.chars();
         for i in 0..BITS {
             self.mask[i] = match mask.next().expect(&format!("Mask should be {} characters long", BITS)) {
-                '0' => BitMask::Override(false),
-                '1' => BitMask::Override(true),
-                _ => BitMask::Passthrough()
+                '0' => BitMask::Passthrough,
+                '1' => BitMask::Override,
+                _ => BitMask::Floating
             }
         }
     }
@@ -118,7 +138,7 @@ fn main() {
             .expect(&format!("Error reading from {}", filename));
         let instructions: Vec<Instruction> = text.split(NEW_LINE).map(|s| s.parse().unwrap()).collect();
         let mut state = MachineState {
-            mask: [BitMask::Passthrough(); BITS],
+            mask: [BitMask::Passthrough; BITS],
             memory: HashMap::new()
         };
         for instruction in instructions {
