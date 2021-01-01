@@ -87,7 +87,7 @@ fn decimal_to_binary(decimal: &usize) -> [bool; BITS] {
     binary
 }
 
-fn binary_to_decimal(binary: &[bool; BITS]) -> usize {//TODO refactor
+fn binary_to_decimal(binary: &[bool; BITS]) -> usize {
     let mut decimal: usize = 0;
     for (power, bit) in binary.iter().rev().enumerate() {
         if *bit {
