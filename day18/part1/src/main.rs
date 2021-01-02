@@ -9,31 +9,27 @@ const DIGITS: [char; 10] = ['0','1','2','3','4','5','6','7','8','9'];
 fn evaluate(expression: &str) -> Result<isize,String> {
     if expression.chars().all(|c| DIGITS.contains(&c)) {
         // parse number
-        println!("Evaluating number: {}", expression);
+        //println!("Evaluating number: {}", expression);
         match expression.parse() {
             Ok(number) => Ok(number),
             Err(_) => Err(format!("Not a number: {}", expression))
         }
     } else {
-        // parse expression
-        println!("Evaluating expression: {}", expression);
+        // parse operation
+        //println!("Evaluating operation: {}", expression);
         let mut remaining = expression.chars();
         let first_operand = read_expression(&mut remaining);
-        println!("First operand: {}", first_operand);
-        match remaining.next() {
-            Some(operator) => {
-                println!("Operator: {}", operator);
-                remaining.next(); // consume space
-                let second_operand = remaining.as_str();
-                println!("Second operand: {}", second_operand);
-                match operator {
-                    '+' => Ok(evaluate(&first_operand)? + evaluate(second_operand)?),
-                    '*' => Ok(evaluate(&first_operand)? * evaluate(second_operand)?),
-                    _ => Err(format!("Operator not found: {}", operator))
-                }
-            },
-            None => evaluate(&first_operand)
+        let mut result: isize = evaluate(&first_operand)?;
+        while let Some(operator) = remaining.next() {
+            assert_eq!(remaining.next().unwrap(),' '); // consume space
+            let next_operand = read_expression(&mut remaining);
+            match operator {
+                '+' => result += evaluate(&next_operand)?,
+                '*' => result *= evaluate(&next_operand)?,
+                _ => return Err(format!("Invalid operator: {}", operator))
+            }
         }
+        Ok(result)
     }
 }
 
