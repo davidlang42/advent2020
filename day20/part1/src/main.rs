@@ -11,7 +11,12 @@ const SIZE: usize = 10;
 
 struct Tile {
     number: usize,
-    data: [[bool; SIZE]; SIZE]
+    data: [[bool; SIZE]; SIZE],
+    // cached for frequent access:
+    top: [bool; SIZE],
+    bottom: [bool; SIZE],
+    left: [bool; SIZE],
+    right: [bool; SIZE],
 }
 
 impl FromStr for Tile {
@@ -38,7 +43,7 @@ impl FromStr for Tile {
                 }
             }
         }
-        Ok(Tile { number, data })
+        Ok(Tile::new(number, data))
     }
 }
 
@@ -60,6 +65,31 @@ impl fmt::Display for Tile {
     }
 }
 
+impl Tile {
+    fn edges(&self) -> [&[bool; SIZE]; 4] {
+        [&self.top, &self.bottom, &self.left, &self.right]
+    }
+
+    fn new(number: usize, data: [[bool; SIZE]; SIZE]) -> Self {
+        let top: [bool; SIZE] = data[0];
+        let bottom: [bool; SIZE] = data[SIZE-1];
+        let mut left: [bool; SIZE] = [false; SIZE];
+        let mut right: [bool; SIZE] = [false; SIZE];
+        for row in 0..SIZE {
+            left[row] = data[row][0];
+            right[row] = data[row][SIZE-1];
+        }
+        Tile {
+            number,
+            data,
+            top,
+            bottom,
+            left,
+            right,
+        }
+    }
+}
+
 fn main() {
     let args: Vec<String> = env::args().collect();
     if args.len() == 2 {
@@ -69,12 +99,31 @@ fn main() {
         let tiles: Vec<Tile> = text.split(DOUBLE_NEW_LINE).map(|s| s.parse()
             .expect(&format!("Error parsing tile {}", s))).collect();
         
-        for tile in tiles {
-            println!("{}", tile);
+        let mut corners: Vec<&Tile> = Vec::new();
+        for tile in tiles.iter() {
+            let mut matching_edges: usize = 0;
+            for edge in tile.edges().iter() {
+                let other_matching_edges = tiles.iter().filter(|t| t.number != tile.number).map(|t| t.edges().iter().filter(|e| could_match(e,edge)).count()).sum();
+                match other_matching_edges {
+                    0 => (),
+                    1 => matching_edges += 1,
+                    _ => println!("PROBLEM: Tile {} edge could match {} other edges", tile.number, other_matching_edges)
+                }
+            }
+            println!("Tile {} matches on {} edges", tile.number, matching_edges);
+            if matching_edges == 2 {
+                corners.push(tile);
+            }
         }
 
-        //println!("Results: {}", count);
+        println!("");
+        println!("Found {} corners: {:?}", corners.len(), corners.iter().map(|t| t.number).collect::<Vec<usize>>());
+        println!("Result: {}", corners.iter().map(|t| t.number).product::<usize>());
     } else {
         println!("Please provide 1 argument: Filename");
     }
+}
+
+fn could_match(a: &[bool; SIZE], b: &[bool; SIZE])-> bool {
+    itertools::equal(a, b) || itertools::equal(a.iter().rev(), b)
 }
