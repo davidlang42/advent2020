@@ -141,7 +141,7 @@ fn main() {
 
 
 
-        let corners: Vec<&Tile> = tiles.iter().filter(|t| edges.iter().filter(|(em,_)| em.tile == t.number).count() == 2).collect();
+        let corners: Vec<&Tile> = tiles.iter().filter(|t| t.get_unmatched_edges(&edges).len() == 2).collect();
         println!("Found {} corners: {:?}", corners.len(), corners.iter().map(|t| t.number).collect::<Vec<usize>>());
         println!("Result: {}", corners.iter().map(|t| t.number).product::<usize>());
     } else {
