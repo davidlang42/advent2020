@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::env;
 use std::fs;
 use std::str::FromStr;
@@ -9,14 +10,26 @@ const NEW_LINE: &str = "\r\n";
 const DOUBLE_NEW_LINE: &str = "\r\n\r\n";
 const SIZE: usize = 10;
 
+#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq)]
+enum EdgeLocation {
+    Top, Bottom, Left, Right
+}
+
+#[derive(Copy, Clone, Hash, Eq, PartialEq)]
+struct EdgeMatch {
+    tile: usize,
+    location: EdgeLocation
+}
+
+struct Edge {
+    location: EdgeLocation,
+    data: [bool; SIZE],
+}
+
 struct Tile {
     number: usize,
     data: [[bool; SIZE]; SIZE],
-    // cached for frequent access:
-    top: [bool; SIZE],
-    bottom: [bool; SIZE],
-    left: [bool; SIZE],
-    right: [bool; SIZE],
+    edges: [Edge; 4]
 }
 
 impl FromStr for Tile {
@@ -66,10 +79,6 @@ impl fmt::Display for Tile {
 }
 
 impl Tile {
-    fn edges(&self) -> [&[bool; SIZE]; 4] {
-        [&self.top, &self.bottom, &self.left, &self.right]
-    }
-
     fn new(number: usize, data: [[bool; SIZE]; SIZE]) -> Self {
         let top: [bool; SIZE] = data[0];
         let bottom: [bool; SIZE] = data[SIZE-1];
@@ -82,12 +91,19 @@ impl Tile {
         Tile {
             number,
             data,
-            top,
-            bottom,
-            left,
-            right,
+            edges: [
+                Edge { location: EdgeLocation::Top, data: top},
+                Edge { location: EdgeLocation::Bottom, data: bottom},
+                Edge { location: EdgeLocation::Left, data: left},
+                Edge { location: EdgeLocation::Right, data: right},
+            ]
         }
     }
+}
+
+struct Point {
+    x: usize,
+    y: usize
 }
 
 fn main() {
@@ -98,7 +114,9 @@ fn main() {
             .expect(&format!("Error reading from {}", filename));
         let tiles: Vec<Tile> = text.split(DOUBLE_NEW_LINE).map(|s| s.parse()
             .expect(&format!("Error parsing tile {}", s))).collect();
-        let (corners, _, _) = find_corners_edges_middles(&tiles).unwrap();
+        let edges = match_edges(&tiles);
+        // let located_tiles = place_tiles(corners, edges, middles);
+        let corners: Vec<&Tile> = tiles.iter().filter(|t| edges.iter().filter(|(em,_)| em.tile == t.number).count() == 2).collect();
         println!("Found {} corners: {:?}", corners.len(), corners.iter().map(|t| t.number).collect::<Vec<usize>>());
         println!("Result: {}", corners.iter().map(|t| t.number).product::<usize>());
     } else {
@@ -106,43 +124,42 @@ fn main() {
     }
 }
 
-fn could_match(a: &[bool; SIZE], b: &[bool; SIZE])-> bool {
+// fn place_tiles(corners: Vec<&Tile>, edges: Vec<&Tile>, middles: Vec<&Tile>) -> HashMap<Point,Tile> {
+//     let mut tiles = HashMap::new();
+
+// }
+
+fn could_match(a: &[bool; SIZE], b: &[bool; SIZE],)-> bool {
     itertools::equal(a, b) || itertools::equal(a.iter().rev(), b)
 }
 
-fn find_corners_edges_middles(tiles: &Vec<Tile>) -> Result<(Vec<&Tile>, Vec<&Tile>, Vec<&Tile>), String> {
-    let mut corners: Vec<&Tile> = Vec::new();
-    let mut edges: Vec<&Tile> = Vec::new();
-    let mut middles: Vec<&Tile> = Vec::new();
-    // count edges which could match
-    for tile in tiles.iter() {
-        let mut matching_edges: usize = 0;
-        for edge in tile.edges().iter() {
-            let other_matching_edges = tiles.iter().filter(|t| t.number != tile.number).map(|t| t.edges().iter().filter(|e| could_match(e,edge)).count()).sum();
-            match other_matching_edges {
-                0 => (),
-                1 => matching_edges += 1,
-                _ => return Err(format!("Tile {} edge could match {} other edges", tile.number, other_matching_edges))
+fn find_match(all_tiles: &Vec<Tile>, this_tile: &Tile, this_edge: &Edge) -> Option<EdgeMatch> {
+    for other_tile in all_tiles.iter().filter(|t| t.number != this_tile.number) {
+        for other_edge in other_tile.edges.iter() {
+            if could_match(&this_edge.data, &other_edge.data) {
+                return Some(EdgeMatch {
+                    tile: other_tile.number,
+                    location: other_edge.location
+                });
             }
         }
-        match matching_edges {
-            4 => middles.push(tile),
-            3 => edges.push(tile),
-            2 => corners.push(tile),
-            _ => return Err(format!("Tile {} had {} matching edges", tile.number, matching_edges))
+    }
+    None
+}
+
+fn match_edges(tiles: &Vec<Tile>) -> HashMap<EdgeMatch,EdgeMatch> {
+    let mut matches: HashMap<EdgeMatch,EdgeMatch> = HashMap::new();
+    for tile in tiles.iter() {
+        for edge in tile.edges.iter() {
+            if let Some(other_edge_match) = find_match(tiles, tile, edge) {
+                let this_edge_match = EdgeMatch {
+                    tile: tile.number,
+                    location: edge.location
+                };
+                matches.insert(this_edge_match, other_edge_match);
+                matches.insert(other_edge_match, this_edge_match);
+            }
         }
     }
-    // verify and return
-    let grid_length: usize = (tiles.len() as f64).sqrt() as usize;
-    let expected_edges = (grid_length - 2) * 4;
-    let expected_middles = tiles.len() - expected_edges - 4;
-    if corners.len() != 4 {
-        Err(format!("Expected 4 corners but found {}", corners.len()))
-    } else if edges.len() != expected_edges {
-        Err(format!("Expected {} edges but found {}", expected_edges, edges.len()))
-    } else if middles.len() != expected_middles {
-        Err(format!("Expected {} middles but found {}", expected_middles, middles.len()))
-    } else {
-        Ok((corners, edges, middles))
-    }
+    matches
 }
