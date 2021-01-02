@@ -18,9 +18,9 @@ Solved in rust for the lols (as a learning exercise)
 - [x] Day 12
 - [x] Day 13
 - [x] Day 14
-- [ ] Day 15
-- [ ] Day 16
-- [ ] Day 17
+- [x] Day 15
+- [x] Day 16
+- [x] Day 17
 - [ ] Day 18
 - [ ] Day 19
 - [ ] Day 20
