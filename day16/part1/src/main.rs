@@ -42,6 +42,7 @@ impl Rule {
     }
 }
 
+#[derive(Debug)]
 struct Ticket {
     values: Vec<usize>
 }
@@ -82,6 +83,14 @@ fn main() {
         let rules: Vec<Rule> = sections[0].split(NEW_LINE).map(|line| line.parse().unwrap()).collect();
         let _my_ticket: Ticket = sections[1].split(NEW_LINE).skip(1).next().unwrap().parse().unwrap();
         let tickets: Vec<Ticket> = sections[2].split(NEW_LINE).skip(1).map(|line| line.parse().unwrap()).collect();
+        //Debug code used for part2:
+        // let valid: Vec<&Ticket> = tickets.iter().filter(|ticket| ticket.find_errors(&rules).is_none()).collect();
+        // let errors: Vec<usize> = tickets.iter().map(|ticket| ticket.find_errors(&rules)).filter(|o| o.is_some()).map(|o| o.unwrap()).collect();
+        // println!("Valid tickets: {}", valid.len());
+        // println!("Sum of {} errors is {}", errors.len(), errors.iter().sum::<usize>());
+        // let bad_indicies: Vec<usize> = tickets.iter().enumerate().map(|(index,ticket)| (index, ticket.find_errors(&rules))).filter(|(_i,o)| o.is_some()).map(|(i,_o)| i).collect();
+        // println!("Bad indicies: {:?}", bad_indicies);
+        // println!("Ticket 185: {:?}", tickets.get(185));
         let sum: usize = tickets.iter().map(|ticket| ticket.find_errors(&rules)).filter(|o| o.is_some()).map(|o| o.unwrap()).sum();
         println!("Result: {}", sum);
     } else {
