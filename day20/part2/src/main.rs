@@ -40,7 +40,6 @@ struct Edge {
 struct Tile {
     number: usize,
     data: [[bool; SIZE]; SIZE],
-    edges: [Edge; 4]
 }
 
 impl FromStr for Tile {
@@ -67,7 +66,7 @@ impl FromStr for Tile {
                 }
             }
         }
-        Ok(Tile::new(number, data))
+        Ok(Tile { number, data })
     }
 }
 
@@ -90,36 +89,40 @@ impl fmt::Display for Tile {
 }
 
 impl Tile {
-    fn new(number: usize, data: [[bool; SIZE]; SIZE]) -> Self {
-        let top: [bool; SIZE] = data[0];
-        let bottom: [bool; SIZE] = data[SIZE-1];
+    fn edges(&self) -> [Edge; 4] {
+        let top: [bool; SIZE] = self.data[0];
+        let bottom: [bool; SIZE] = self.data[SIZE-1];
         let mut left: [bool; SIZE] = [false; SIZE];
         let mut right: [bool; SIZE] = [false; SIZE];
         for row in 0..SIZE {
-            left[row] = data[row][0];
-            right[row] = data[row][SIZE-1];
+            left[row] = self.data[row][0];
+            right[row] = self.data[row][SIZE-1];
         }
-        Tile {
-            number,
-            data,
-            edges: [
-                Edge { location: EdgeLocation::Top, data: top},
-                Edge { location: EdgeLocation::Bottom, data: bottom},
-                Edge { location: EdgeLocation::Left, data: left},
-                Edge { location: EdgeLocation::Right, data: right},
-            ]
-        }
+        [
+            Edge { location: EdgeLocation::Top, data: top},
+            Edge { location: EdgeLocation::Bottom, data: bottom},
+            Edge { location: EdgeLocation::Left, data: left},
+            Edge { location: EdgeLocation::Right, data: right},
+        ]
+    }
+
+    fn get_unmatched_edges(&self, edges: &HashMap<EdgeMatch,EdgeMatch>) -> Vec<EdgeLocation> {
+        self.edges().iter().filter(|e| !edges.contains_key(&EdgeMatch { tile: self.number, location: e.location })).map(|e| e.location).collect()
     }
 
     fn transform(&self, required_left_edge: EdgeLocation, required_top_edge: EdgeLocation) -> Tile {
-
+        //TODO
+        Tile {
+            number: self.number,
+            data: self.data.clone()
+        }
     }
 }
 
 #[derive(Hash, Eq, PartialEq)]
 struct Point {
-    row: usize,
-    col: usize
+    row: isize,
+    col: isize
 }
 
 fn main() {
@@ -131,7 +134,7 @@ fn main() {
         let tiles: Vec<Tile> = text.split(DOUBLE_NEW_LINE).map(|s| s.parse()
             .expect(&format!("Error parsing tile {}", s))).collect();
         let edges = match_edges(&tiles);
-        let placed = place_tiles(&tiles, &edges);
+        //let placed = place_tiles(&tiles, &edges);
 
 
 
@@ -147,26 +150,24 @@ fn main() {
 }
 
 fn place_tiles(tiles: &Vec<Tile>, edges: &HashMap<EdgeMatch, EdgeMatch>) -> HashMap<Point,Tile> {
-    let mut remaining: Vec<&Tile> = tiles.iter().collect();
     let grid_length: usize = (tiles.len() as f64).sqrt() as usize;
-    let last_index: usize = grid_length - 1;
     let mut placed: HashMap<Point,Tile> = HashMap::new();
     for row in 0..grid_length {
         for col in 0..grid_length {
-            let edge_left = match placed.get(&Point { row, col: col - 1 }) {
+            let edge_left = match placed.get(&Point { row: row as isize, col: col as isize - 1 }) {
                 Some(tile_left) => edges.get(&EdgeMatch { tile: tile_left.number, location: EdgeLocation::Right }),
                 None => None
             };
-            let edge_top = match placed.get(&Point { row: row - 1, col }) {
+            let edge_top = match placed.get(&Point { row: row as isize - 1, col: col as isize }) {
                 Some(tile_top) => edges.get(&EdgeMatch { tile: tile_top.number, location: EdgeLocation::Bottom }),
                 None => None
             };
             let new_tile: Tile = match (edge_left, edge_top) {
                 (None, None) => {
                     // place any corner first, the choice doesn't matter
-                    let corner: Option<Tile> = None;
+                    let mut corner: Option<Tile> = None;
                     for existing_tile in tiles.iter() {
-                        let matched_edges: Vec<EdgeLocation> = existing_tile.edges.iter().map(|e| edges.get(&EdgeMatch { tile: existing_tile.number, location: e.location })).filter(|o| o.is_some()).map(|em| em.unwrap().location).collect();
+                        let matched_edges: Vec<EdgeLocation> = existing_tile.edges().iter().map(|e| edges.get(&EdgeMatch { tile: existing_tile.number, location: e.location })).filter(|o| o.is_some()).map(|em| em.unwrap().location).collect();
                         if matched_edges.len() == 2 {
                             corner = Some(existing_tile.transform(matched_edges[0].opposite(), matched_edges[1].opposite()));
                             break;
@@ -177,16 +178,16 @@ fn place_tiles(tiles: &Vec<Tile>, edges: &HashMap<EdgeMatch, EdgeMatch>) -> Hash
                 (Some(left), None) => {
                     // placing edge in top row, not first corner
                     let existing_tile = tiles.iter().filter(|t| t.number == left.tile).nth(0).unwrap();
-                    //TODO need to take into account that the top right corner will have 2 non-matching edges and it needs to be the one which isn't opposite left.location
-                    let non_matched_edge = existing_tile.edges.iter().filter(|e| !edges.contains_key(&EdgeMatch { tile: existing_tile.number, location: e.location })).nth(0).unwrap().location;
-                    existing_tile.transform(left.location, non_matched_edge)
+                    let non_matched_edges = existing_tile.get_unmatched_edges(&edges);
+                    let non_matched_edge = non_matched_edges.iter().filter(|el| **el != left.location.opposite()).nth(0).unwrap();
+                    existing_tile.transform(left.location, *non_matched_edge)
                 },
                 (None, Some(top)) => {
                     // placing edge in first col, not top row
                     let existing_tile = tiles.iter().filter(|t| t.number == top.tile).nth(0).unwrap();
-                    //TODO need to take into account that the bottom left corner will have 2 non-matching edges and it needs to be the one which isn't opposite top.location
-                    let non_matched_edge = existing_tile.edges.iter().filter(|e| !edges.contains_key(&EdgeMatch { tile: existing_tile.number, location: e.location })).nth(0).unwrap().location;
-                    existing_tile.transform(non_matched_edge, top.location)
+                    let non_matched_edges = existing_tile.get_unmatched_edges(&edges);
+                    let non_matched_edge = non_matched_edges.iter().filter(|el| **el != top.location.opposite()).nth(0).unwrap();
+                    existing_tile.transform(*non_matched_edge, top.location)
                 },
                 (Some(left), Some(top)) => {
                     // placing middles
@@ -195,7 +196,7 @@ fn place_tiles(tiles: &Vec<Tile>, edges: &HashMap<EdgeMatch, EdgeMatch>) -> Hash
                     existing_tile.transform(left.location, top.location)
                 }
             };
-            placed.insert(Point { row, col }, new_tile);
+            placed.insert(Point { row: row as isize, col: col as isize }, new_tile);
         }
     }
     placed
@@ -207,7 +208,7 @@ fn could_match(a: &[bool; SIZE], b: &[bool; SIZE],)-> bool {
 
 fn find_match(all_tiles: &Vec<Tile>, this_tile: &Tile, this_edge: &Edge) -> Option<EdgeMatch> {
     for other_tile in all_tiles.iter().filter(|t| t.number != this_tile.number) {
-        for other_edge in other_tile.edges.iter() {
+        for other_edge in other_tile.edges().iter() {
             if could_match(&this_edge.data, &other_edge.data) {
                 return Some(EdgeMatch {
                     tile: other_tile.number,
@@ -222,7 +223,7 @@ fn find_match(all_tiles: &Vec<Tile>, this_tile: &Tile, this_edge: &Edge) -> Opti
 fn match_edges(tiles: &Vec<Tile>) -> HashMap<EdgeMatch,EdgeMatch> {
     let mut matches: HashMap<EdgeMatch,EdgeMatch> = HashMap::new();
     for tile in tiles.iter() {
-        for edge in tile.edges.iter() {
+        for edge in tile.edges().iter() {
             if let Some(other_edge_match) = find_match(tiles, tile, edge) {
                 let this_edge_match = EdgeMatch {
                     tile: tile.number,
