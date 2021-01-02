@@ -47,35 +47,29 @@ struct PocketDimension {
 
 impl PocketDimension {
     fn cycle(&mut self) {
-        // let mut new_cubes: HashMap<Point,Cube> = HashMap::new();
-        // for (row_index, row) in self.seats.iter().enumerate() {
-        //     let mut new_row: Vec<Seat> = Vec::new();
-        //     for (col_index, seat) in row.iter().enumerate() {
-        //         new_row.push(match seat {
-        //             Seat::Occupied => {
-        //                 if self.count_surrounding_seats(row_index, col_index) >= 5 {
-        //                     changes = true;
-        //                     Seat::Empty
-        //                 } else {
-        //                     Seat::Occupied
-        //                 }
-        //             },
-        //             Seat::Empty => {
-        //                 if self.count_surrounding_seats(row_index, col_index) == 0 {
-        //                     changes = true;
-        //                     Seat::Occupied
-        //                 } else {
-        //                     Seat::Empty
-        //                 }
-        //             },
-        //             Seat::None => Seat::None
-        //         });
-        //     }
-        //     new_seats.push(new_row);
-        // }
-        // self.seats = new_seats;
-        // self.step += 1;
-        // changes
+        let mut new_cubes: HashMap<Point,Cube> = HashMap::new();
+        let (min,max) = self.get_bounds();
+        for x in (min.x-1)..(max.x+2) {
+            for y in (min.y-1)..(max.y+2) {
+                for z in (min.z-1)..(max.z+2) {
+                    let point = Point { x,y,z };
+                    let adjacent_active_count = self.get_adjacent_cubes(&point).iter().filter(|c| c.is_active()).count();
+                    match self.get_cube(&point) {
+                        Cube::Active => {
+                            if adjacent_active_count == 2 || adjacent_active_count == 3 {
+                                new_cubes.insert(point, Cube::Active);
+                            }
+                        },
+                        Cube::Inactive => {
+                            if adjacent_active_count == 3 {
+                                new_cubes.insert(point, Cube::Active);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        self.cubes = new_cubes;
     }
 
     fn get_adjacent_cubes(&self, point: &Point) -> Vec<&Cube> {
