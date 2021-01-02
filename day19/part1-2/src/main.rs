@@ -146,7 +146,6 @@ fn main() {
         let sections: Vec<&str> = text.split("\r\n\r\n").collect();
         let rules: Rules = sections[0].parse().unwrap();
         let messages: Vec<&str> = sections[1].split(NEW_LINE).collect();
-        
         let mut count: usize = 0;
         for message in messages {
             match rules.verify_root(message) {
@@ -159,8 +158,6 @@ fn main() {
                 Err(error) => println!("Error: {}", error)
             };
         }
-
-        //let count = messages.iter().filter(|m| rules.verify_root(m)).count();
         println!("Results: {}", count);
     } else {
         println!("Please provide 1 argument: Filename");
