@@ -9,7 +9,8 @@ const NEW_LINE: &str = "\r\n";
 struct Point {
     x: isize,
     y: isize,
-    z: isize
+    z: isize,
+    w: isize
 }
 
 #[derive(Copy, Clone)]
@@ -52,17 +53,19 @@ impl PocketDimension {
         for x in (min.x-1)..(max.x+2) {
             for y in (min.y-1)..(max.y+2) {
                 for z in (min.z-1)..(max.z+2) {
-                    let point = Point { x,y,z };
-                    let adjacent_active_count = self.get_adjacent_cubes(&point).iter().filter(|c| c.is_active()).count();
-                    match self.get_cube(&point) {
-                        Cube::Active => {
-                            if adjacent_active_count == 2 || adjacent_active_count == 3 {
-                                new_cubes.insert(point, Cube::Active);
-                            }
-                        },
-                        Cube::Inactive => {
-                            if adjacent_active_count == 3 {
-                                new_cubes.insert(point, Cube::Active);
+                    for w in (min.w-1)..(max.w+2) {
+                        let point = Point { x,y,z,w };
+                        let adjacent_active_count = self.get_adjacent_cubes(&point).iter().filter(|c| c.is_active()).count();
+                        match self.get_cube(&point) {
+                            Cube::Active => {
+                                if adjacent_active_count == 2 || adjacent_active_count == 3 {
+                                    new_cubes.insert(point, Cube::Active);
+                                }
+                            },
+                            Cube::Inactive => {
+                                if adjacent_active_count == 3 {
+                                    new_cubes.insert(point, Cube::Active);
+                                }
                             }
                         }
                     }
@@ -77,12 +80,15 @@ impl PocketDimension {
         for x_offset in -1..2 {
             for y_offset in -1..2 {
                 for z_offset in -1..2 {
-                    if x_offset != 0 || y_offset != 0 || z_offset != 0 {
-                        adjacent_cubes.push(self.get_cube(&Point {
-                            x: point.x + x_offset,
-                            y: point.y + y_offset,
-                            z: point.z + z_offset
-                        }));
+                    for w_offset in -1..2 {
+                        if x_offset != 0 || y_offset != 0 || z_offset != 0 || w_offset != 0 {
+                            adjacent_cubes.push(self.get_cube(&Point {
+                                x: point.x + x_offset,
+                                y: point.y + y_offset,
+                                z: point.z + z_offset,
+                                w: point.w + w_offset
+                            }));
+                        }
                     }
                 }
             }
@@ -101,13 +107,13 @@ impl PocketDimension {
         self.cubes.iter().filter(|(_p,c)| c.is_active()).map(|(p,_c)| *p).collect()
     }
 
-    fn to_plane(&self, z_plane: isize) -> String {
+    fn to_plane(&self, z_plane: isize, w_plane: isize) -> String {
         let (min,max) = self.get_bounds();
         let active_points = self.get_active_points();
         let mut s = String::new();
         for y in min.y..(max.y+1) {
             for x in min.x..(max.x+1) {
-                if active_points.contains(&Point {x,y,z:z_plane}) {
+                if active_points.contains(&Point {x,y,z:z_plane,w:w_plane}) {
                     s.push(Cube::Active.to_char());
                 } else {
                     s.push(Cube::Inactive.to_char());
@@ -121,11 +127,13 @@ impl PocketDimension {
     fn to_string(&self) -> String {
         let (min,max) = self.get_bounds();
         let mut s = String::new();
-        for z in min.z..(max.z+1) {
-            s.push_str(&format!("z={}",z));
-            s.push_str(NEW_LINE);
-            s.push_str(&self.to_plane(z));
-            s.push_str(NEW_LINE);
+        for w in min.w..(max.w+1) {
+            for z in min.z..(max.z+1) {
+                s.push_str(&format!("z={},w={}",z,w));
+                s.push_str(NEW_LINE);
+                s.push_str(&self.to_plane(z,w));
+                s.push_str(NEW_LINE);
+            }
         }
         s
     }
@@ -135,12 +143,14 @@ impl PocketDimension {
         let min = Point {
             x: active_points.iter().map(|p| p.x).min().unwrap(),
             y: active_points.iter().map(|p| p.y).min().unwrap(),
-            z: active_points.iter().map(|p| p.z).min().unwrap()
+            z: active_points.iter().map(|p| p.z).min().unwrap(),
+            w: active_points.iter().map(|p| p.w).min().unwrap()
         };
         let max = Point {
             x: active_points.iter().map(|p| p.x).max().unwrap(),
             y: active_points.iter().map(|p| p.y).max().unwrap(),
-            z: active_points.iter().map(|p| p.z).max().unwrap()
+            z: active_points.iter().map(|p| p.z).max().unwrap(),
+            w: active_points.iter().map(|p| p.w).max().unwrap()
         };
         (min,max)
     }
@@ -154,7 +164,8 @@ impl PocketDimension {
                 pocket_dimension.cubes.insert(Point {
                     x: x as isize,
                     y: y as isize,
-                    z: 0
+                    z: 0,
+                    w: 0
                 }, *cube);
             }
         }
