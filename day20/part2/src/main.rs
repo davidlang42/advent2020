@@ -111,7 +111,7 @@ impl Tile {
     }
 
     fn transform(&self, required_left_edge: EdgeLocation, required_top_edge: EdgeLocation) -> Tile {
-        //TODO
+        //TODO actually transform
         Tile {
             number: self.number,
             data: self.data.clone()
@@ -134,12 +134,9 @@ fn main() {
         let tiles: Vec<Tile> = text.split(DOUBLE_NEW_LINE).map(|s| s.parse()
             .expect(&format!("Error parsing tile {}", s))).collect();
         let edges = match_edges(&tiles);
+
+        //TODO make place_tiles work, convert to image, search for monsters, flag pixels as used for monster, count pixels which are true but not used for monster
         //let placed = place_tiles(&tiles, &edges);
-
-
-
-
-
 
         let corners: Vec<&Tile> = tiles.iter().filter(|t| t.get_unmatched_edges(&edges).len() == 2).collect();
         println!("Found {} corners: {:?}", corners.len(), corners.iter().map(|t| t.number).collect::<Vec<usize>>());
