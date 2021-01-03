@@ -9,13 +9,17 @@ use std::fmt;
 const NEW_LINE: &str = "\r\n";
 const DOUBLE_NEW_LINE: &str = "\r\n\r\n";
 
+const MONSTER_DATA: &str = "                  # 
+#    ##    ##    ###
+ #  #  #  #  #  #   ";
+
 struct EdgeMap {
     edges: HashMap<Vec<bool>, Vec<Edge>>
 }
 
 impl EdgeMap {
     fn insert_reversible(&mut self, edge: Edge) {
-        self.insert_inner(edge.data, edge);
+        self.insert_inner(edge.data.clone(), edge.clone());
         self.insert_inner(edge.reversed_data(), edge);
     }
 
@@ -51,17 +55,6 @@ impl EdgeMap {
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq)]
 enum EdgeLocation {
     Top, Bottom, Left, Right
-}
-
-impl EdgeLocation {
-    fn opposite(&self) -> EdgeLocation {
-        match self {
-            EdgeLocation::Top => EdgeLocation::Bottom,
-            EdgeLocation::Bottom => EdgeLocation::Top,
-            EdgeLocation::Left => EdgeLocation::Right,
-            EdgeLocation::Right => EdgeLocation::Left,
-        }
-    }
 }
 
 #[derive(Clone)]
@@ -163,23 +156,41 @@ impl Tile {
         ]
     }
 
+    fn get_edge(&self, location: &EdgeLocation) -> Edge {
+        self.get_edges().into_iter().filter(|e| e.location == *location).nth(0).unwrap()
+    }
+
     fn transform(&self, required_left_edge: EdgeLocation, required_top_edge: EdgeLocation) -> Result<Tile, String> {
-        //TODO actually transform (by calling image.rotate_clockwise() and image.flip())
         let image = match (required_left_edge, required_top_edge) {
             (EdgeLocation::Left, EdgeLocation::Top) => Image { data: self.image.data.clone() },
             (EdgeLocation::Bottom, EdgeLocation::Left) => self.image.rotate_clockwise(),
             (EdgeLocation::Right, EdgeLocation::Bottom) => self.image.rotate_clockwise().rotate_clockwise(),
             (EdgeLocation::Top, EdgeLocation::Right) => self.image.rotate_clockwise().rotate_clockwise().rotate_clockwise(),
-            (EdgeLocation::Top, EdgeLocation::Left) => self.image.flip(),
-            (EdgeLocation::Right, EdgeLocation::Top) => self.image.flip().rotate_clockwise(),
-            (EdgeLocation::Bottom, EdgeLocation::Right) => self.image.flip().rotate_clockwise().rotate_clockwise(),
-            (EdgeLocation::Left, EdgeLocation::Bottom) => self.image.flip().rotate_clockwise().rotate_clockwise().rotate_clockwise(),
-            _ => return Err("Cannot transform like that".to_string())
+            (EdgeLocation::Top, EdgeLocation::Left) => self.image.flip_vertical(),
+            (EdgeLocation::Right, EdgeLocation::Top) => self.image.flip_vertical().rotate_clockwise(),
+            (EdgeLocation::Bottom, EdgeLocation::Right) => self.image.flip_vertical().rotate_clockwise().rotate_clockwise(),
+            (EdgeLocation::Left, EdgeLocation::Bottom) => self.image.flip_vertical().rotate_clockwise().rotate_clockwise().rotate_clockwise(),
+            _ => return Err(format!("Cannot transform to have {:?} at the top and {:?} on the left", required_top_edge, required_left_edge))
         };
+        println!("\r\nTransforming tile {} requiring {:?} on left and {:?} on top from:\r\n{}\r\nto:\r\n{}\r\n",self.number,required_left_edge, required_top_edge, self.image,image);
         Ok(Tile {
             number: self.number,
             image
         })
+    }
+
+    fn find_unmatched_edges(&self, edges: &EdgeMap) -> Vec<Edge> {
+        let mut unmatched: Vec<Edge> = Vec::new();
+        for edge in self.get_edges() {
+            if edges.get_match(&edge).is_none() {
+                unmatched.push(edge);
+            }
+        }
+        unmatched
+    }
+
+    fn find_unmatched_edge(&self, edges: &EdgeMap) -> Edge {
+        self.find_unmatched_edges(&edges).into_iter().nth(0).unwrap()
     }
 }
 
@@ -187,15 +198,16 @@ struct Image {
     data: Vec<Vec<bool>>
 }
 
+#[derive(Hash, PartialEq, Eq)]
 struct Point {
-    row: isize,
-    col: isize
+    row: usize,
+    col: usize
 }
 
 impl Image {
-    fn find_pattern(&self, pattern: &Image) -> Vec<Point> {
-        //TODO
-        Vec::new()
+    fn find_pattern(&self, _pattern: &Image) -> Vec<Point> {
+        //TODO (LATER)
+        panic!();
     }
 
     fn count_active_pixels(&self) -> usize {
@@ -210,12 +222,12 @@ impl Image {
         count
     }
 
-    fn from_placed_tiles(tiles: &Vec<Vec<Tile>>) -> Self {
-        //TODO
-        Image { data: Vec::new() }
+    fn from_placed_tiles(_tiles: &Vec<Vec<Tile>>) -> Self {
+        //TODO (LATER)
+        panic!();
     }
 
-    fn flip(&self) -> Image {
+    fn flip_vertical(&self) -> Image {
         let mut flipped_data = Vec::new();
         for row in self.data.iter() {
             flipped_data.insert(0, row.clone())
@@ -224,13 +236,17 @@ impl Image {
     }
 
     fn rotate_clockwise(&self) -> Image {
-        //TODO
-        Image { data: Vec::new() }
+        let transposed = transpose(&self.data);
+        let mut new_data: Vec<Vec<bool>> = Vec::new();
+        for row in transposed.iter() {
+            new_data.push(row.iter().rev().map(|b| *b).collect());
+        }
+        Image { data: new_data }
     }
 
     fn all_orientations(&self) -> [Image; 8] {
         let original = Image { data: self.data.clone() };
-        let flipped = original.flip();
+        let flipped = original.flip_vertical();
         let original90 = original.rotate_clockwise();
         let flipped90 = flipped.rotate_clockwise();
         let original180 = original90.rotate_clockwise();
@@ -254,6 +270,16 @@ fn main() {
             .expect(&format!("Error reading from {}", filename));
         let tiles: Vec<Tile> = text.split(DOUBLE_NEW_LINE).map(|s| s.parse()
             .expect(&format!("Error parsing tile {}", s))).collect();
+
+
+        let tile = tiles.into_iter().nth(0).unwrap();
+        println!("Original {}", tile);
+        let rotated = tile.image.rotate_clockwise();
+        println!("Rotated:\r\n{}", rotated);
+
+        panic!();
+
+
         let edges = EdgeMap::from_tiles(&tiles);
         let placed = arrange_tiles(&tiles, &edges);
         
@@ -262,23 +288,84 @@ fn main() {
         println!("Found {} corners: {:?}", corners.len(), corners.iter().map(|t| t.number).collect::<Vec<usize>>());
         println!("Part1 result: {}", corners.iter().map(|t| t.number).product::<usize>());
 
-        // find result for part2
-        let image = Image::from_placed_tiles(&placed);
-        let monster = generate_monster();
-        let monsters = monster.all_orientations();
-        let found_monsters: Vec<Point> = monsters.iter().flat_map(|m| image.find_pattern(m)).collect();
-        let image_pixels: usize = image.count_active_pixels();
-        let monster_pixels: usize = found_monsters.len() * monster.count_active_pixels();
-        let remaining_pixels = image_pixels - monster_pixels;
-        println!("Part2 result: {}", remaining_pixels);
+        //TODO
+        // // find result for part2
+        // let image = Image::from_placed_tiles(&placed);
+        // let monster: Image = MONSTER_DATA.parse().unwrap();
+        // let monsters = monster.all_orientations();
+        // let found_monsters: Vec<Point> = monsters.iter().flat_map(|m| image.find_pattern(m)).collect();
+        // let image_pixels: usize = image.count_active_pixels();
+        // let monster_pixels: usize = found_monsters.len() * monster.count_active_pixels();
+        // let remaining_pixels = image_pixels - monster_pixels;
+        // println!("Part2 result: {}", remaining_pixels);
     } else {
         println!("Please provide 1 argument: Filename");
     }
 }
 
 fn arrange_tiles(tiles: &Vec<Tile>, edges: &EdgeMap) -> Vec<Vec<Tile>> {
-    //TODO
-    Vec::new()
+    let grid = (tiles.len() as f64).sqrt() as usize;
+    let mut placed: HashMap<Point,Tile> = HashMap::new();
+    for row in 0..grid {
+        for col in 0..grid {
+            let edge_left = find_matching_edge(&placed, &edges, row as isize, col as isize - 1, &EdgeLocation::Right);
+            let edge_top = find_matching_edge(&placed, &edges, row as isize - 1, col as isize, &EdgeLocation::Top);
+            let this_tile: Tile = match (edge_left, edge_top) {
+                (Some(left), Some(top)) => { // not first row or column
+                    assert_eq!(left.tile, top.tile);
+                    let existing_tile = find_tile(&tiles, left.tile);
+                    existing_tile.transform(left.location, top.location).unwrap()
+                },
+                (Some(left), None) => { // first row, not first column
+                    let existing_tile = find_tile(&tiles, left.tile);
+                    let unmatched_edge = existing_tile.find_unmatched_edge(&edges);
+                    existing_tile.transform(left.location, unmatched_edge.location).unwrap()
+                },
+                (None, Some(top)) => { // first column, not first row
+                    let existing_tile = find_tile(&tiles, top.tile);
+                    let unmatched_edge = existing_tile.find_unmatched_edge(&edges);
+                    existing_tile.transform(unmatched_edge.location, top.location).unwrap()
+                },
+                (None, None) => { // only at (0,0)
+                    let (existing_tile, unmatched_edges) = tiles.iter()
+                        .map(|t| (t, t.find_unmatched_edges(&edges))) // calc unmatched edges of tile
+                        .filter(|(_t, u)| u.len() == 2) // find corners
+                        .nth(0).unwrap(); // pick any corner to start
+                    existing_tile.transform(unmatched_edges[1].location, unmatched_edges[0].location).unwrap() // 2 possible orientations here, but doesn't matter, chosen only to match example for debugging
+                }
+            };
+            println!("Placing tile {} at ({},{})",this_tile.number, row, col);
+            placed.insert(Point { row, col }, this_tile);
+        }
+    }
+    // convert to vec
+    let mut data_vec: Vec<Vec<Tile>> = Vec::new();
+    for row in 0..grid {
+        let mut row_vec: Vec<Tile> = Vec::new();
+        for col in 0..grid {
+            row_vec.push(placed.remove(&Point { row, col }).unwrap())
+        }
+        data_vec.push(row_vec);
+    }
+    data_vec
+}
+
+fn find_tile(tiles: &Vec<Tile>, number: usize) -> &Tile {
+    tiles.iter().filter(|t| t.number == number).nth(0).unwrap()
+}
+
+fn find_matching_edge(placed: &HashMap<Point,Tile>, edges: &EdgeMap, row: isize, col: isize, location: &EdgeLocation) -> Option<Edge> {
+    if row < 0 || col < 0 {
+        None
+    } else {
+        match placed.get(&Point { row: row as usize, col: col as usize }) {
+            Some(tile) => match edges.get_match(&tile.get_edge(location)) {
+                Some(matched_edge) => Some(matched_edge.clone()),
+                None => None
+            },
+            None => None
+        }
+    }
 }
 
 fn get_corners(placed_tiles: &Vec<Vec<Tile>>) -> [&Tile; 4] {
@@ -292,9 +379,13 @@ fn get_corners(placed_tiles: &Vec<Vec<Tile>>) -> [&Tile; 4] {
     ]
 }
 
-fn generate_monster() -> Image {
-    let image_data = "                  # 
-#    ##    ##    ###
- #  #  #  #  #  #   ";
-    image_data.parse().unwrap()
+//source: https://stackoverflow.com/questions/64498617/how-to-transpose-a-vector-of-vectors-in-rust
+fn transpose<T>(v: &Vec<Vec<T>>) -> Vec<Vec<T>>
+where
+    T: Clone,
+{
+    assert!(!v.is_empty());
+    (0..v[0].len())
+        .map(|i| v.iter().map(|inner| inner[i].clone()).collect::<Vec<T>>())
+        .collect()
 }
