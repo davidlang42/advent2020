@@ -166,13 +166,12 @@ impl Tile {
             (EdgeLocation::Bottom, EdgeLocation::Left) => self.image.rotate_clockwise(),
             (EdgeLocation::Right, EdgeLocation::Bottom) => self.image.rotate_clockwise().rotate_clockwise(),
             (EdgeLocation::Top, EdgeLocation::Right) => self.image.rotate_clockwise().rotate_clockwise().rotate_clockwise(),
-            (EdgeLocation::Top, EdgeLocation::Left) => self.image.flip_vertical(),
-            (EdgeLocation::Right, EdgeLocation::Top) => self.image.flip_vertical().rotate_clockwise(),
-            (EdgeLocation::Bottom, EdgeLocation::Right) => self.image.flip_vertical().rotate_clockwise().rotate_clockwise(),
-            (EdgeLocation::Left, EdgeLocation::Bottom) => self.image.flip_vertical().rotate_clockwise().rotate_clockwise().rotate_clockwise(),
+            (EdgeLocation::Top, EdgeLocation::Left) => self.image.flip_vertical().rotate_clockwise(),
+            (EdgeLocation::Right, EdgeLocation::Top) => self.image.flip_vertical().rotate_clockwise().rotate_clockwise(),
+            (EdgeLocation::Bottom, EdgeLocation::Right) => self.image.flip_vertical().rotate_clockwise().rotate_clockwise().rotate_clockwise(),
+            (EdgeLocation::Left, EdgeLocation::Bottom) => self.image.flip_vertical(),
             _ => return Err(format!("Cannot transform to have {:?} at the top and {:?} on the left", required_top_edge, required_left_edge))
         };
-        println!("\r\nTransforming tile {} requiring {:?} on left and {:?} on top from:\r\n{}\r\nto:\r\n{}\r\n",self.number,required_left_edge, required_top_edge, self.image,image);
         Ok(Tile {
             number: self.number,
             image
@@ -274,8 +273,16 @@ fn main() {
 
         let tile = tiles.into_iter().nth(0).unwrap();
         println!("Original {}", tile);
-        let rotated = tile.image.rotate_clockwise();
-        println!("Rotated:\r\n{}", rotated);
+        let options = vec![EdgeLocation::Left, EdgeLocation::Right, EdgeLocation::Top, EdgeLocation::Bottom];
+        for left in options.iter() {
+            for top in options.iter() {
+                match tile.transform(*left, *top) {
+                    Ok(transformed) => println!("\r\nLEFT={:?}, TOP={:?}:\r\n{}", left, top, transformed.image),
+                    Err(error) => println!("\r\nError: LEFT={:?}, TOP={:?}:\r\n{}", left, top, error),
+                };
+            }
+        }
+        
 
         panic!();
 
