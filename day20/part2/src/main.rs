@@ -8,10 +8,9 @@ use std::fmt;
 
 const NEW_LINE: &str = "\r\n";
 const DOUBLE_NEW_LINE: &str = "\r\n\r\n";
-const SIZE: usize = 10;
 
 struct EdgeMap {
-    edges: HashMap<[bool; SIZE], Vec<Edge>>
+    edges: HashMap<Vec<bool>, Vec<Edge>>
 }
 
 impl EdgeMap {
@@ -20,7 +19,7 @@ impl EdgeMap {
         self.insert_inner(edge.reversed_data(), edge);
     }
 
-    fn insert_inner(&mut self, data: [bool; SIZE], edge: Edge) {
+    fn insert_inner(&mut self, data: Vec<bool>, edge: Edge) {
         match self.edges.remove(&data) {
             Some(mut vec) => {
                 vec.push(edge);
@@ -65,18 +64,18 @@ impl EdgeLocation {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 struct Edge {
     tile: usize,
     location: EdgeLocation,
-    data: [bool; SIZE],
+    data: Vec<bool>,
 }
 
 impl Edge {
-    fn reversed_data(&self) -> [bool; SIZE] {
-        let mut rev = [false; SIZE];
-        for i in 0..SIZE {
-            rev[i] = self.data[SIZE-i-1];
+    fn reversed_data(&self) -> Vec<bool> {
+        let mut rev = Vec::new();
+        for value in self.data.iter().rev() {
+            rev.push(*value);
         }
         rev
     }
@@ -84,7 +83,7 @@ impl Edge {
 
 struct Tile {
     number: usize,
-    data: [[bool; SIZE]; SIZE],
+    image: Image,
 }
 
 impl FromStr for Tile {
@@ -94,34 +93,47 @@ impl FromStr for Tile {
         lazy_static! {
             static ref TILE_NUMBER: Regex = Regex::new("^Tile (\\d+):$").unwrap();
         }
-        let lines: Vec<&str> = text.split(NEW_LINE).collect();
-        assert_eq!(lines.len(), SIZE+1);
-        let number: usize = match TILE_NUMBER.captures(lines[0]) {
+        let mut lines: Vec<&str> = text.split(NEW_LINE).collect();
+        let number: usize = match TILE_NUMBER.captures(lines.remove(0)) {
             Some(number_match) => number_match.get(1).unwrap().as_str().parse().expect("This regex should only return a number"),
             None => return Err("Tile number not found".to_string())
         };
-        let mut data = [[false; SIZE]; SIZE];
-        for row in 0..SIZE {
-            let mut chars = lines[row+1].chars();
-            for col in 0..SIZE {
-                data[row][col] = match chars.next() {
-                    Some('#') => true,
-                    Some(_) => false,
-                    None => return Err("Row was too short".to_string())
-                }
+        Ok(Tile { number, image: lines.join(NEW_LINE).parse()? })
+    }
+}
+
+impl FromStr for Image {
+    type Err = String;
+
+    fn from_str(text: &str) -> Result<Self, Self::Err> {
+        let lines = text.split(NEW_LINE);
+        let mut data = Vec::new();
+        for line in lines {
+            let mut row = Vec::new();
+            for c in line.chars() {
+                row.push(match c {
+                    '#' => true,
+                    _ => false,
+                });
             }
+            data.push(row);
         }
-        Ok(Tile { number, data })
+        Ok(Image { data })
     }
 }
 
 impl fmt::Display for Tile {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        writeln!(f, "Tile {}:", self.number)?;
-        for row in 0..SIZE {
+        writeln!(f, "Tile {}:\r\n{}", self.number, self.image)
+    }
+}
+
+impl fmt::Display for Image {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        for row in self.data.iter() {
             let mut s = String::new();
-            for col in 0..SIZE {
-                if self.data[row][col] {
+            for value in row {
+                if *value {
                     s.push('#');
                 } else {
                     s.push('.');
@@ -135,13 +147,13 @@ impl fmt::Display for Tile {
 
 impl Tile {
     fn get_edges(&self) -> Vec<Edge> {
-        let top: [bool; SIZE] = self.data[0];
-        let bottom: [bool; SIZE] = self.data[SIZE-1];
-        let mut left: [bool; SIZE] = [false; SIZE];
-        let mut right: [bool; SIZE] = [false; SIZE];
-        for row in 0..SIZE {
-            left[row] = self.data[row][0];
-            right[row] = self.data[row][SIZE-1];
+        let top = self.image.data[0].clone();
+        let bottom = self.image.data[self.image.data.len()-1].clone();
+        let mut left = Vec::new();
+        let mut right = Vec::new();
+        for row in self.image.data.iter() {
+            left.push(row[0]);
+            right.push(row[row.len()-1]);
         }
         vec![
             Edge { tile: self.number, location: EdgeLocation::Top, data: top},
@@ -151,12 +163,23 @@ impl Tile {
         ]
     }
 
-    fn transform(&self, required_left_edge: EdgeLocation, required_top_edge: EdgeLocation) -> Tile {
-        //TODO actually transform
-        Tile {
+    fn transform(&self, required_left_edge: EdgeLocation, required_top_edge: EdgeLocation) -> Result<Tile, String> {
+        //TODO actually transform (by calling image.rotate_clockwise() and image.flip())
+        let image = match (required_left_edge, required_top_edge) {
+            (EdgeLocation::Left, EdgeLocation::Top) => Image { data: self.image.data.clone() },
+            (EdgeLocation::Bottom, EdgeLocation::Left) => self.image.rotate_clockwise(),
+            (EdgeLocation::Right, EdgeLocation::Bottom) => self.image.rotate_clockwise().rotate_clockwise(),
+            (EdgeLocation::Top, EdgeLocation::Right) => self.image.rotate_clockwise().rotate_clockwise().rotate_clockwise(),
+            (EdgeLocation::Top, EdgeLocation::Left) => self.image.flip(),
+            (EdgeLocation::Right, EdgeLocation::Top) => self.image.flip().rotate_clockwise(),
+            (EdgeLocation::Bottom, EdgeLocation::Right) => self.image.flip().rotate_clockwise().rotate_clockwise(),
+            (EdgeLocation::Left, EdgeLocation::Bottom) => self.image.flip().rotate_clockwise().rotate_clockwise().rotate_clockwise(),
+            _ => return Err("Cannot transform like that".to_string())
+        };
+        Ok(Tile {
             number: self.number,
-            data: self.data.clone()
-        }
+            image
+        })
     }
 }
 
@@ -270,115 +293,8 @@ fn get_corners(placed_tiles: &Vec<Vec<Tile>>) -> [&Tile; 4] {
 }
 
 fn generate_monster() -> Image {
-    //TODO
-    Image { data: Vec::new() }
+    let image_data = "                  # 
+#    ##    ##    ###
+ #  #  #  #  #  #   ";
+    image_data.parse().unwrap()
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-// #[derive(Hash, Eq, PartialEq)]
-// struct Point {
-//     row: isize,
-//     col: isize
-// }
-//
-// fn place_tiles_old(tiles: &Vec<Tile>, edges: &HashMap<EdgeMatch, EdgeMatch>) -> HashMap<Point,Tile> {
-//     let grid_length: usize = (tiles.len() as f64).sqrt() as usize;
-//     let mut placed: HashMap<Point,Tile> = HashMap::new();
-//     for row in 0..grid_length {
-//         for col in 0..grid_length {
-//             let edge_left = match placed.get(&Point { row: row as isize, col: col as isize - 1 }) {
-//                 Some(tile_left) => edges.get(&EdgeMatch { tile: tile_left.number, location: EdgeLocation::Right }),
-//                 None => None
-//             };
-//             let edge_top = match placed.get(&Point { row: row as isize - 1, col: col as isize }) {
-//                 Some(tile_top) => edges.get(&EdgeMatch { tile: tile_top.number, location: EdgeLocation::Bottom }),
-//                 None => None
-//             };
-//             let new_tile: Tile = match (edge_left, edge_top) {
-//                 (None, None) => {
-//                     // place any corner first, the choice doesn't matter
-//                     let mut corner: Option<Tile> = None;
-//                     for existing_tile in tiles.iter() {
-//                         let matched_edges: Vec<EdgeLocation> = existing_tile.edges().iter().map(|e| edges.get(&EdgeMatch { tile: existing_tile.number, location: e.location })).filter(|o| o.is_some()).map(|em| em.unwrap().location).collect();
-//                         if matched_edges.len() == 2 {
-//                             corner = Some(existing_tile.transform(matched_edges[0].opposite(), matched_edges[1].opposite()));
-//                             break;
-//                         }
-//                     }
-//                     corner.unwrap()
-//                 },
-//                 (Some(left), None) => {
-//                     // placing edge in top row, not first corner
-//                     let existing_tile = tiles.iter().filter(|t| t.number == left.tile).nth(0).unwrap();
-//                     let non_matched_edges = existing_tile.get_unmatched_edges(&edges);
-//                     let non_matched_edge = non_matched_edges.iter().filter(|el| **el != left.location.opposite()).nth(0).unwrap();
-//                     existing_tile.transform(left.location, *non_matched_edge)
-//                 },
-//                 (None, Some(top)) => {
-//                     // placing edge in first col, not top row
-//                     let existing_tile = tiles.iter().filter(|t| t.number == top.tile).nth(0).unwrap();
-//                     let non_matched_edges = existing_tile.get_unmatched_edges(&edges);
-//                     let non_matched_edge = non_matched_edges.iter().filter(|el| **el != top.location.opposite()).nth(0).unwrap();
-//                     existing_tile.transform(*non_matched_edge, top.location)
-//                 },
-//                 (Some(left), Some(top)) => {
-//                     // placing middles
-//                     assert_eq!(left.tile, top.tile);
-//                     let existing_tile = tiles.iter().filter(|t| t.number == left.tile).nth(0).unwrap();
-//                     existing_tile.transform(left.location, top.location)
-//                 }
-//             };
-//             placed.insert(Point { row: row as isize, col: col as isize }, new_tile);
-//         }
-//     }
-//     placed
-// }
-
-// fn could_match(a: &[bool; SIZE], b: &[bool; SIZE],)-> bool {
-//     itertools::equal(a, b) || itertools::equal(a.iter().rev(), b)
-// }
-
-// fn find_match(all_tiles: &Vec<Tile>, this_tile: &Tile, this_edge: &Edge) -> Option<EdgeMatch> {
-//     for other_tile in all_tiles.iter().filter(|t| t.number != this_tile.number) {
-//         for other_edge in other_tile.edges().iter() {
-//             if could_match(&this_edge.data, &other_edge.data) {
-//                 return Some(EdgeMatch {
-//                     tile: other_tile.number,
-//                     location: other_edge.location
-//                 });
-//             }
-//         }
-//     }
-//     None
-// }
-
-// fn match_edges(tiles: &Vec<Tile>) -> HashMap<EdgeMatch,EdgeMatch> {
-//     let mut matches: HashMap<EdgeMatch,EdgeMatch> = HashMap::new();
-//     for tile in tiles.iter() {
-//         for edge in tile.edges().iter() {
-//             if let Some(other_edge_match) = find_match(tiles, tile, edge) {
-//                 let this_edge_match = EdgeMatch {
-//                     tile: tile.number,
-//                     location: edge.location
-//                 };
-//                 matches.insert(this_edge_match, other_edge_match);
-//                 matches.insert(other_edge_match, this_edge_match);
-//             }
-//         }
-//     }
-//     matches
-// }
