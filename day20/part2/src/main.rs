@@ -57,6 +57,17 @@ enum EdgeLocation {
     Top, Bottom, Left, Right
 }
 
+impl EdgeLocation {
+    fn opposite(&self) -> EdgeLocation {
+        match self {
+            EdgeLocation::Top => EdgeLocation::Bottom,
+            EdgeLocation::Bottom => EdgeLocation::Top,
+            EdgeLocation::Left => EdgeLocation::Right,
+            EdgeLocation::Right => EdgeLocation::Left,
+        }
+    }
+}
+
 #[derive(Clone)]
 struct Edge {
     tile: usize,
@@ -178,18 +189,14 @@ impl Tile {
         })
     }
 
-    fn find_unmatched_edges(&self, edges: &EdgeMap) -> Vec<Edge> {
-        let mut unmatched: Vec<Edge> = Vec::new();
+    fn find_unmatched_edge_locations(&self, edges: &EdgeMap) -> Vec<EdgeLocation> {
+        let mut unmatched = Vec::new();
         for edge in self.get_edges() {
             if edges.get_match(&edge).is_none() {
-                unmatched.push(edge);
+                unmatched.push(edge.location);
             }
         }
         unmatched
-    }
-
-    fn find_unmatched_edge(&self, edges: &EdgeMap) -> Edge {
-        self.find_unmatched_edges(&edges).into_iter().nth(0).unwrap()
     }
 }
 
@@ -269,31 +276,21 @@ fn main() {
             .expect(&format!("Error reading from {}", filename));
         let tiles: Vec<Tile> = text.split(DOUBLE_NEW_LINE).map(|s| s.parse()
             .expect(&format!("Error parsing tile {}", s))).collect();
-
-
-        let tile = tiles.into_iter().nth(0).unwrap();
-        println!("Original {}", tile);
-        let options = vec![EdgeLocation::Left, EdgeLocation::Right, EdgeLocation::Top, EdgeLocation::Bottom];
-        for left in options.iter() {
-            for top in options.iter() {
-                match tile.transform(*left, *top) {
-                    Ok(transformed) => println!("\r\nLEFT={:?}, TOP={:?}:\r\n{}", left, top, transformed.image),
-                    Err(error) => println!("\r\nError: LEFT={:?}, TOP={:?}:\r\n{}", left, top, error),
-                };
-            }
-        }
-        
-
-        panic!();
-
-
         let edges = EdgeMap::from_tiles(&tiles);
         let placed = arrange_tiles(&tiles, &edges);
-        
-        // confirm still works for part1
-        let corners = get_corners(&placed);
-        println!("Found {} corners: {:?}", corners.len(), corners.iter().map(|t| t.number).collect::<Vec<usize>>());
-        println!("Part1 result: {}", corners.iter().map(|t| t.number).product::<usize>());
+        // confirm tiles are placed correctly
+        for row in placed.iter() {
+            for tile in row {
+                print!("{} ", tile.number);
+            }
+            println!("");
+        }
+        println!("");
+        // confirm result from part1
+        let corners: Vec<usize> = get_corners(&placed).iter().map(|t| t.number).collect();
+        println!("Found {} corners: {:?}", corners.len(), corners);
+        println!("Product: {}", corners.iter().product::<usize>());
+        println!("");
 
         //TODO
         // // find result for part2
@@ -316,7 +313,7 @@ fn arrange_tiles(tiles: &Vec<Tile>, edges: &EdgeMap) -> Vec<Vec<Tile>> {
     for row in 0..grid {
         for col in 0..grid {
             let edge_left = find_matching_edge(&placed, &edges, row as isize, col as isize - 1, &EdgeLocation::Right);
-            let edge_top = find_matching_edge(&placed, &edges, row as isize - 1, col as isize, &EdgeLocation::Top);
+            let edge_top = find_matching_edge(&placed, &edges, row as isize - 1, col as isize, &EdgeLocation::Bottom);
             let this_tile: Tile = match (edge_left, edge_top) {
                 (Some(left), Some(top)) => { // not first row or column
                     assert_eq!(left.tile, top.tile);
@@ -325,23 +322,25 @@ fn arrange_tiles(tiles: &Vec<Tile>, edges: &EdgeMap) -> Vec<Vec<Tile>> {
                 },
                 (Some(left), None) => { // first row, not first column
                     let existing_tile = find_tile(&tiles, left.tile);
-                    let unmatched_edge = existing_tile.find_unmatched_edge(&edges);
-                    existing_tile.transform(left.location, unmatched_edge.location).unwrap()
+                    let unmatched_edge = existing_tile.find_unmatched_edge_locations(&edges)
+                        .into_iter().filter(|l| l.opposite() != left.location).nth(0).unwrap(); // matters for top right corner
+                    existing_tile.transform(left.location, unmatched_edge).unwrap()
                 },
                 (None, Some(top)) => { // first column, not first row
                     let existing_tile = find_tile(&tiles, top.tile);
-                    let unmatched_edge = existing_tile.find_unmatched_edge(&edges);
-                    existing_tile.transform(unmatched_edge.location, top.location).unwrap()
+                    let unmatched_edge = existing_tile.find_unmatched_edge_locations(&edges)
+                        .into_iter().filter(|l| l.opposite() != top.location).nth(0).unwrap(); // matters for bottom left
+                    existing_tile.transform(unmatched_edge, top.location).unwrap()
+                    
                 },
                 (None, None) => { // only at (0,0)
                     let (existing_tile, unmatched_edges) = tiles.iter()
-                        .map(|t| (t, t.find_unmatched_edges(&edges))) // calc unmatched edges of tile
+                        .map(|t| (t, t.find_unmatched_edge_locations(&edges))) // calc unmatched edges of tile
                         .filter(|(_t, u)| u.len() == 2) // find corners
                         .nth(0).unwrap(); // pick any corner to start
-                    existing_tile.transform(unmatched_edges[1].location, unmatched_edges[0].location).unwrap() // 2 possible orientations here, but doesn't matter, chosen only to match example for debugging
+                    existing_tile.transform(unmatched_edges[1], unmatched_edges[0]).unwrap() // 2 possible orientations here, but doesn't matter, chosen only to match example for debugging
                 }
             };
-            println!("Placing tile {} at ({},{})",this_tile.number, row, col);
             placed.insert(Point { row, col }, this_tile);
         }
     }
