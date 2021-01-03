@@ -26,8 +26,13 @@ impl EdgeLocation {
     }
 }
 
-struct Edge {
+#[derive(Copy, Clone, Hash, Eq, PartialEq)]
+struct EdgeMatch {
     tile: usize,
+    location: EdgeLocation
+}
+
+struct Edge {
     location: EdgeLocation,
     data: [bool; SIZE],
 }
@@ -84,7 +89,7 @@ impl fmt::Display for Tile {
 }
 
 impl Tile {
-    fn get_edges(&self) -> [Edge; 4] {
+    fn edges(&self) -> [Edge; 4] {
         let top: [bool; SIZE] = self.data[0];
         let bottom: [bool; SIZE] = self.data[SIZE-1];
         let mut left: [bool; SIZE] = [false; SIZE];
@@ -94,11 +99,15 @@ impl Tile {
             right[row] = self.data[row][SIZE-1];
         }
         [
-            Edge { tile: self.number, location: EdgeLocation::Top, data: top},
-            Edge { tile: self.number, location: EdgeLocation::Bottom, data: bottom},
-            Edge { tile: self.number, location: EdgeLocation::Left, data: left},
-            Edge { tile: self.number, location: EdgeLocation::Right, data: right},
+            Edge { location: EdgeLocation::Top, data: top},
+            Edge { location: EdgeLocation::Bottom, data: bottom},
+            Edge { location: EdgeLocation::Left, data: left},
+            Edge { location: EdgeLocation::Right, data: right},
         ]
+    }
+
+    fn get_unmatched_edges(&self, edges: &HashMap<EdgeMatch,EdgeMatch>) -> Vec<EdgeLocation> {
+        self.edges().iter().filter(|e| !edges.contains_key(&EdgeMatch { tile: self.number, location: e.location })).map(|e| e.location).collect()
     }
 
     fn transform(&self, required_left_edge: EdgeLocation, required_top_edge: EdgeLocation) -> Tile {
