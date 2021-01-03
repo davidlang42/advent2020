@@ -9,9 +9,7 @@ use std::fmt;
 const NEW_LINE: &str = "\r\n";
 const DOUBLE_NEW_LINE: &str = "\r\n\r\n";
 
-const MONSTER_DATA: &str = "                  # 
-#    ##    ##    ###
- #  #  #  #  #  #   ";
+const MONSTER_DATA: &str = "                  # \r\n#    ##    ##    ###\r\n #  #  #  #  #  #   ";
 
 struct EdgeMap {
     edges: HashMap<Vec<bool>, Vec<Edge>>
@@ -198,6 +196,10 @@ impl Tile {
         }
         unmatched
     }
+
+    fn without_borders(&self) -> Vec<Vec<bool>> {
+        self.image.data[1..(self.image.data.len()-1)].iter().map(|row| row[1..(row.len()-1)].to_vec()).collect()
+    }
 }
 
 struct Image {
@@ -211,9 +213,37 @@ struct Point {
 }
 
 impl Image {
-    fn find_pattern(&self, _pattern: &Image) -> Vec<Point> {
-        //TODO (LATER)
-        panic!();
+    fn find_pattern(&self, pattern: &Image) -> Vec<Point> {
+        let mut found = Vec::new();
+        let image_size = self.bounds();
+        let pattern_size = pattern.bounds();
+        for row in 0..(image_size.row - pattern_size.row) {
+            for col in 0..(image_size.col - pattern_size.col) {
+                let starting_point = Point { row, col };
+                if self.verify(pattern, &starting_point) {
+                    found.push(starting_point);
+                }
+            }
+        }
+        found
+    }
+
+    fn bounds(&self) -> Point {
+        Point {
+            row: self.data.len(),
+            col: self.data[0].len()
+        }
+    }
+
+    fn verify(&self, pattern: &Image, offset: &Point) -> bool {
+        for (r, row) in pattern.data.iter().enumerate() {
+            for (c, value) in row.iter().enumerate() {
+                if *value && !self.data[offset.row+r][offset.col+c] {
+                    return false;
+                }
+            }
+        }
+        true
     }
 
     fn count_active_pixels(&self) -> usize {
@@ -228,9 +258,20 @@ impl Image {
         count
     }
 
-    fn from_placed_tiles(_tiles: &Vec<Vec<Tile>>) -> Self {
-        //TODO (LATER)
-        panic!();
+    fn from_placed_tiles(tiles: &Vec<Vec<Tile>>) -> Self {
+        let mut image: Vec<Vec<bool>> = Vec::new();
+        for tile_row in tiles.iter() {
+            let mut new_image_rows: Vec<Vec<bool>> = tile_row[0].without_borders();
+            for tile in tile_row.iter().skip(1) {
+                for (data_row_index, data_row) in tile.without_borders().iter().enumerate() {
+                    for data_point in data_row {
+                        new_image_rows[data_row_index].push(*data_point);
+                    }
+                }
+            }
+            image.append(&mut new_image_rows);
+        }
+        Image { data: image }
     }
 
     fn flip_vertical(&self) -> Image {
@@ -265,45 +306,6 @@ impl Image {
             original180, flipped180,
             original270, flipped270
         ]
-    }
-}
-
-fn main() {
-    let args: Vec<String> = env::args().collect();
-    if args.len() == 2 {
-        let filename = &args[1];
-        let text = fs::read_to_string(&filename)
-            .expect(&format!("Error reading from {}", filename));
-        let tiles: Vec<Tile> = text.split(DOUBLE_NEW_LINE).map(|s| s.parse()
-            .expect(&format!("Error parsing tile {}", s))).collect();
-        let edges = EdgeMap::from_tiles(&tiles);
-        let placed = arrange_tiles(&tiles, &edges);
-        // confirm tiles are placed correctly
-        for row in placed.iter() {
-            for tile in row {
-                print!("{} ", tile.number);
-            }
-            println!("");
-        }
-        println!("");
-        // confirm result from part1
-        let corners: Vec<usize> = get_corners(&placed).iter().map(|t| t.number).collect();
-        println!("Found {} corners: {:?}", corners.len(), corners);
-        println!("Product: {}", corners.iter().product::<usize>());
-        println!("");
-
-        //TODO
-        // // find result for part2
-        // let image = Image::from_placed_tiles(&placed);
-        // let monster: Image = MONSTER_DATA.parse().unwrap();
-        // let monsters = monster.all_orientations();
-        // let found_monsters: Vec<Point> = monsters.iter().flat_map(|m| image.find_pattern(m)).collect();
-        // let image_pixels: usize = image.count_active_pixels();
-        // let monster_pixels: usize = found_monsters.len() * monster.count_active_pixels();
-        // let remaining_pixels = image_pixels - monster_pixels;
-        // println!("Part2 result: {}", remaining_pixels);
-    } else {
-        println!("Please provide 1 argument: Filename");
     }
 }
 
@@ -394,4 +396,43 @@ where
     (0..v[0].len())
         .map(|i| v.iter().map(|inner| inner[i].clone()).collect::<Vec<T>>())
         .collect()
+}
+
+
+fn main() {
+    let args: Vec<String> = env::args().collect();
+    if args.len() == 2 {
+        let filename = &args[1];
+        let text = fs::read_to_string(&filename)
+            .expect(&format!("Error reading from {}", filename));
+        let tiles: Vec<Tile> = text.split(DOUBLE_NEW_LINE).map(|s| s.parse()
+            .expect(&format!("Error parsing tile {}", s))).collect();
+        let edges = EdgeMap::from_tiles(&tiles);
+        let placed = arrange_tiles(&tiles, &edges);
+        // confirm tiles are placed correctly
+        for row in placed.iter() {
+            for tile in row {
+                print!("{} ", tile.number);
+            }
+            println!("");
+        }
+        println!("");
+        // confirm result from part1
+        let corners: Vec<usize> = get_corners(&placed).iter().map(|t| t.number).collect();
+        println!("Found {} corners: {:?}", corners.len(), corners);
+        println!("Product: {}", corners.iter().product::<usize>());
+        println!("");
+        // find result for part2
+        let image = Image::from_placed_tiles(&placed);
+        let monster: Image = MONSTER_DATA.parse().unwrap();
+        let monsters = monster.all_orientations();
+        let found_monsters: Vec<Point> = monsters.iter().flat_map(|m| image.find_pattern(m)).collect();
+        let image_pixels: usize = image.count_active_pixels();
+        let monster_pixels: usize = found_monsters.len() * monster.count_active_pixels();
+        let remaining_pixels = image_pixels - monster_pixels;
+        println!("Found {} monsters", found_monsters.len());
+        println!("Part 2 result: {}", remaining_pixels);
+    } else {
+        println!("Please provide 1 argument: Filename");
+    }
 }
