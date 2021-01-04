@@ -2,7 +2,7 @@
 
 https://adventofcode.com/2020
 
-Solved in rust for the lols (as a learning exercise)
+Solved in rust as a learning exercise
 
 - [x] Day 1
 - [x] Day 2
