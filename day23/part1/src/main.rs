@@ -69,6 +69,14 @@ impl CupCircle {
             None => *self.cups.iter().max().unwrap()
         }
     }
+
+    fn cup_string(&self) -> String { // excluding current cup
+        let mut s = String::new();
+        for cup in self.cups.iter().skip(1) {
+            s.push_str(&format!("{}",cup));
+        }
+        s
+    }
 }
 
 fn main() {
@@ -90,9 +98,13 @@ fn main() {
             circle.move_to_value(destination);
             circle.move_next(); // so we insert after destination
             circle.place_cups(taken_cups);
+            circle.move_to_value(current); // back to initial current cup
+            circle.move_next(); // next cup for next round
             println!("");
         }
         println!("Final: {}", circle);
+        circle.move_to_value(1);
+        println!("Order after Cup1: {}", circle.cup_string())
     } else {
         println!("Please provide 2 arguments: Filename, Moves");
     }
