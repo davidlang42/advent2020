@@ -5,9 +5,7 @@ use std::str::FromStr;
 use std::fmt;
 
 /*
-SPEED:
-^^^^^^
-VecDeque= ~0.5 seconds per 100
+Note: this took ~3hrs to run
 */
 
 const NUMBER_OF_CUPS: usize = 1000000;
