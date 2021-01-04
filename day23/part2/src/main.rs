@@ -10,7 +10,7 @@ SPEED:
 VecDeque= ~0.5 seconds per 100
 */
 
-const NUMBER_OF_CUPS: usize = 9;
+const NUMBER_OF_CUPS: usize = 1000000;
 
 struct CupCircle {
     cups: VecDeque<usize>,
@@ -107,13 +107,13 @@ fn main() {
         let mut circle: CupCircle = text.parse().expect("Error parsing cups");
         let moves: usize = args[2].parse().expect("Error parsing moves");
         for m in 0..moves {
-            if m % 100 == 0 {
-                //println!("Move {}", m+1)
+            if m % 1000 == 0 {
+                println!("Move {}", m+1)
             }
-            println!("Before move {}: {}", m+1, circle);
+            //println!("Before move {}: {}", m+1, circle);
             let current_value = circle.read_current();
             let taken_cups = circle.take_cups(circle.index, 3);
-            println!("Taken: {:?}", taken_cups);
+            //println!("Taken: {:?}", taken_cups);
             let mut destination_value: usize = current_value - 1;
             if destination_value == 0 {
                 destination_value = NUMBER_OF_CUPS;
@@ -124,13 +124,13 @@ fn main() {
                     destination_value = NUMBER_OF_CUPS;
                 }
             }
-            println!("Destination: {}", destination_value);
+            //println!("Destination: {}", destination_value);
             let destination_index = circle.find_value(&destination_value);
             circle.place_cups(destination_index, taken_cups);
             circle.move_next(); // next cup for next round
-            println!("");
+            //println!("");
         }
-        println!("Final: {}", circle);
+        //println!("Final: {}", circle);
         let index_of_one = circle.find_value(&1);
         circle.index = index_of_one;
         circle.move_next(); // dont read 1
