@@ -91,6 +91,7 @@ fn main() {
         }
         println!("");
         println!("Ingredients without allergens: {:?}", map.ingredients_without_allergens);
+        println!("");
         let count: usize = map.ingredients_without_allergens.iter().map(|i| labels.iter().filter(|l| l.ingredients.contains(i)).count()).sum();
         println!("Number of times these appear on labels: {}", count);
     } else {
